@@ -1,0 +1,23 @@
+node_modules
+.next
+out
+*.tsbuildinfo
+next-env.d.ts
+.env*.local
+.DS_Store
+
+# env files (never commit secrets)
+.env
+.env.*
+!.env.example
+
+# vercel
+.vercel
+
+# build / logs / misc
+build
+coverage
+*.log
+npm-debug.log*
+*.pem
+Thumbs.db
