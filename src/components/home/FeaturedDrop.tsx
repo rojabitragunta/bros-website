@@ -5,6 +5,7 @@ import type { Product } from "@/types";
 import { ProductCard } from "@/components/product/ProductCard";
 import { ButtonLink } from "@/components/ui/Button";
 import { Parallax, Reveal, TextReveal } from "@/components/ui/Reveal";
+import { PLACEHOLDER_IMAGE } from "@/lib/catalog-utils";
 import { formatPrice } from "@/lib/utils";
 
 function Header({ total }: { total: number }) {
@@ -71,7 +72,7 @@ export function FeaturedDrop({ products, total }: { products: Product[]; total: 
   }
 
   const [hero, a, b, c, d] = products;
-  const lifestyle = d.images.find((i) => i.view === "lifestyle") ?? d.images[0];
+  const lifestyle = d.images?.find((i) => i.view === "lifestyle") ?? d.images?.[0] ?? { src: PLACEHOLDER_IMAGE, alt: `${d.name} — photo coming soon` };
 
   return (
     <section aria-labelledby="drop-title" className={sectionCls}>

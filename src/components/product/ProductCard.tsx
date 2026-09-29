@@ -7,7 +7,7 @@ import { Plus, X } from "lucide-react";
 import { useState } from "react";
 import { colourMap } from "@/data/colours";
 import { useAddToBag } from "@/hooks/use-add-to-bag";
-import { soldOutSizesFor } from "@/lib/catalog-utils";
+import { PLACEHOLDER_IMAGE, soldOutSizesFor } from "@/lib/catalog-utils";
 import { cn, formatPrice } from "@/lib/utils";
 import type { ColourId, Product } from "@/types";
 import { ProductBadgeLabel } from "@/components/ui/Badge";
@@ -32,13 +32,13 @@ export function ProductCard({
   size = "default",
   aspect = "aspect-[4/5]",
 }: ProductCardProps) {
-  const [colour, setColour] = useState<ColourId>(product.colours[0].colour);
+  const [colour, setColour] = useState<ColourId>(product.colours[0]?.colour ?? "onyx");
   const [quickOpen, setQuickOpen] = useState(false);
   const addToBag = useAddToBag();
 
-  const variant = product.colours.find((c) => c.colour === colour) ?? product.colours[0];
-  const primary = variant.images.find((i) => i.view === "front") ?? variant.images[0];
-  const secondary = variant.images.find((i) => i.view === "model") ?? variant.images[1];
+  const images = (product.colours.find((c) => c.colour === colour) ?? product.colours[0])?.images ?? [];
+  const primary = images.find((i) => i.view === "front") ?? images[0] ?? { src: PLACEHOLDER_IMAGE, alt: `${product.name} — photo coming soon` };
+  const secondary = images.find((i) => i.view === "model") ?? images[1];
   const href = `/products/${product.slug}${colour !== product.colours[0].colour ? `?colour=${colour}` : ""}`;
   const badge = product.badges[0];
   const soldOut = soldOutSizesFor(product, colour);

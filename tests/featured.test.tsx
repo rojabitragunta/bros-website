@@ -80,6 +80,13 @@ describe("FeaturedDrop", () => {
     for (const n of [1, 2, 3]) assert.match(html, new RegExp(`Product ${n}`));
     assert.doesNotMatch(html, /Pieces landing soon/);
   });
+  test("does not crash when products have no images", () => {
+    const bare = list(5).map((p) => ({ ...p, images: [], colours: [{ colour: "onyx" as const, images: [] }] }));
+    for (const n of [1, 4, 5]) {
+      const html = renderToStaticMarkup(<FeaturedDrop products={bare.slice(0, n)} total={n} />);
+      assert.match(html, /placeholder-product.svg/);
+    }
+  });
   test("renders the editorial layout with five products", () => {
     const html = renderToStaticMarkup(<FeaturedDrop products={list(5)} total={12} />);
     assert.match(html, /Hero piece/);
