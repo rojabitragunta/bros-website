@@ -89,3 +89,16 @@ export function priceBoundsOf(list: Product[]) {
   if (!list.length) return { min: 0, max: 0 };
   return { min: Math.min(...list.map((p) => p.price)), max: Math.max(...list.map((p) => p.price)) };
 }
+
+/**
+ * Homepage feature selection: preferred slugs first (in order), then other
+ * products by rank, up to `limit`. Never returns undefined entries.
+ */
+export function pickFeatured(all: Product[], preferred: string[], limit = 5): Product[] {
+  const chosen = preferred.map((s) => all.find((p) => p.slug === s)).filter((p): p is Product => Boolean(p));
+  for (const p of [...all].sort((a, b) => a.featuredRank - b.featuredRank)) {
+    if (chosen.length >= limit) break;
+    if (!chosen.includes(p)) chosen.push(p);
+  }
+  return chosen.slice(0, limit);
+}

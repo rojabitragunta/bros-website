@@ -11,9 +11,9 @@ import { Marquee } from "@/components/ui/Marquee";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { lookbookChapters } from "@/data/lookbook";
 import { marqueeWords, site } from "@/data/site";
-import { getProductBySlug, getProducts } from "@/lib/services/catalog";
+import { pickFeatured } from "@/lib/catalog-utils";
+import { getProducts } from "@/lib/services/catalog";
 import { pageMetadata } from "@/lib/seo";
-import type { Product } from "@/types";
 
 export const metadata = pageMetadata({ title: site.title, path: "/" });
 
@@ -26,8 +26,10 @@ const FEATURED = [
 ];
 
 export default async function HomePage() {
-  const featured = (await Promise.all(FEATURED.map(getProductBySlug))).filter((p): p is Product => Boolean(p));
-  const total = (await getProducts()).length;
+  const all = await getProducts();
+  // Works with any catalogue size, including an empty one.
+  const featured = pickFeatured(all, FEATURED, 5);
+  const total = all.length;
 
   const orgJsonLd = {
     "@context": "https://schema.org",

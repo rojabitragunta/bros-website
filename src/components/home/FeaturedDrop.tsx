@@ -7,32 +7,76 @@ import { ButtonLink } from "@/components/ui/Button";
 import { Parallax, Reveal, TextReveal } from "@/components/ui/Reveal";
 import { formatPrice } from "@/lib/utils";
 
+function Header({ total }: { total: number }) {
+  return (
+    <div className="relative mb-12 grid gap-6 md:mb-20 md:grid-cols-12 md:items-end">
+      <div className="md:col-span-8">
+        <p className="eyebrow mb-4 text-ink/50">Collection / {total ? `${String(total).padStart(2, "0")} pieces` : "Arriving soon"}</p>
+        <TextReveal as="h2" lines={["Drop 001"]} className="display whitespace-nowrap text-[clamp(4rem,21vw,15rem)] leading-[0.8] md:text-[12vw] 2xl:text-[11rem]" />
+      </div>
+      <div className="md:col-span-4 md:pb-3">
+        <p className="display text-3xl sm:text-4xl" id="drop-title">
+          Built for the rep.
+        </p>
+        <p className="mt-4 max-w-sm text-sm leading-relaxed text-ink/65">
+          One idea: kit that moves the way you do. Technical knits, considered fits, nothing you don&rsquo;t need.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+const sectionCls = "on-light relative isolate overflow-hidden bg-paper py-20 text-ink md:py-32";
+
 /**
- * Editorial, asymmetric product composition.
- * Expects products in order: [hero, small, small, secondary, lifestyle].
+ * Editorial, asymmetric product composition when 5+ products are available
+ * ([hero, small, small, secondary, lifestyle]); a simple grid for 1–4; and an
+ * "arriving soon" state when the catalogue is empty.
  */
 export function FeaturedDrop({ products, total }: { products: Product[]; total: number }) {
+  if (products.length < 5) {
+    return (
+      <section aria-labelledby="drop-title" className={sectionCls}>
+        <div className="container-x">
+          <Header total={total} />
+          {products.length ? (
+            <ul className="grid grid-cols-2 gap-x-3 gap-y-10 md:grid-cols-4 md:gap-x-5">
+              {products.map((p, i) => (
+                <li key={p.id}>
+                  <Reveal delay={i * 0.08}>
+                    <ProductCard product={p} preload={i < 2} sizes="(min-width: 768px) 25vw, 50vw" />
+                  </Reveal>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="border border-ink/15 px-6 py-16 text-center md:py-24">
+              <p className="eyebrow text-ink/50">Drop 001</p>
+              <p className="display mt-4 text-[clamp(2.25rem,5vw,4rem)]">Pieces landing soon.</p>
+              <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-ink/65">
+                We&rsquo;re photographing the collection now. Join the list below to hear first when it goes live.
+              </p>
+            </div>
+          )}
+          {products.length > 0 && (
+            <div className="mt-16 flex justify-center md:mt-24">
+              <ButtonLink href="/shop" variant="ink" size="lg" icon={<ArrowRight className="size-4" strokeWidth={1.5} />}>
+                Shop all
+              </ButtonLink>
+            </div>
+          )}
+        </div>
+      </section>
+    );
+  }
+
   const [hero, a, b, c, d] = products;
   const lifestyle = d.images.find((i) => i.view === "lifestyle") ?? d.images[0];
 
   return (
-    <section aria-labelledby="drop-title" className="on-light relative isolate overflow-hidden bg-paper py-20 text-ink md:py-32">
+    <section aria-labelledby="drop-title" className={sectionCls}>
       <div className="container-x">
-        {/* Header */}
-        <div className="relative mb-12 grid gap-6 md:mb-20 md:grid-cols-12 md:items-end">
-          <div className="md:col-span-8">
-            <p className="eyebrow mb-4 text-ink/50">Collection / {String(total).padStart(2, "0")} pieces</p>
-            <TextReveal as="h2" lines={["Drop 001"]} className="display whitespace-nowrap text-[clamp(4rem,21vw,15rem)] leading-[0.8] md:text-[12vw] 2xl:text-[11rem]" />
-          </div>
-          <div className="md:col-span-4 md:pb-3">
-            <p className="display text-3xl sm:text-4xl" id="drop-title">
-              Built for the rep.
-            </p>
-            <p className="mt-4 max-w-sm text-sm leading-relaxed text-ink/65">
-              Twelve pieces. One idea: kit that moves the way you do. Technical knits, considered fits, nothing you don&rsquo;t need.
-            </p>
-          </div>
-        </div>
+        <Header total={total} />
 
         {/* Row A — hero product + stacked text/products */}
         <div className="grid gap-x-5 gap-y-12 md:grid-cols-12">
