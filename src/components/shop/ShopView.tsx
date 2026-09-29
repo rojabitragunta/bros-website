@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { colourMap } from "@/data/colours";
 import { shopCategories } from "@/data/categories";
 import { media } from "@/data/media";
-import { filterProducts, matchesCategory } from "@/lib/services/catalog";
+import { filterProducts, matchesCategory } from "@/lib/catalog-utils";
 import { cn } from "@/lib/utils";
 import type { Product, SortOption } from "@/types";
 import { Button } from "@/components/ui/Button";

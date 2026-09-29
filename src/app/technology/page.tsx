@@ -2,7 +2,7 @@ import Image from "next/image";
 import { ArrowRight, Droplets, Shirt, ThermometerSnowflake, Wind } from "lucide-react";
 import { labSpecs, techPillars } from "@/data/technology";
 import { media } from "@/data/media";
-import { productImagePath } from "@/lib/services/catalog";
+import { productImagePath } from "@/lib/catalog-utils";
 import { pageMetadata } from "@/lib/seo";
 import { ButtonLink } from "@/components/ui/Button";
 import { Parallax, Reveal, TextReveal } from "@/components/ui/Reveal";

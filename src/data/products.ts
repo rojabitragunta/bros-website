@@ -1,9 +1,9 @@
 /**
  * DEMO CATALOGUE — development data only.
  *
- * These are sample products used to experience the Phase 1 frontend. Names,
+ * These are sample products used to demo the store. Names,
  * prices, fabric specs and ratings are illustrative and do not describe
- * products that currently exist. Replace with the catalogue API in Phase 2.
+ * products that currently exist. Used only to seed the database (npm run db:seed).
  *
  * Self-contained on purpose (type-only imports) so the asset generator in
  * scripts/ can import it directly.

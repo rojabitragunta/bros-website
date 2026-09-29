@@ -1,7 +1,7 @@
 import type { ColourId, SizeCode } from "./product";
 
 /**
- * Commerce domain types. Cart lives in local state for Phase 1; Order and
+ * Commerce domain types shared by the storefront and server. Order and
  * Address are defined now so the account/checkout UI already speaks the
  * shape the backend will return.
  */
@@ -18,6 +18,8 @@ export interface CartItem {
   size: SizeCode;
   quantity: number;
   image: string;
+  /** Purchasable quantity when added (server re-validates at checkout). */
+  max?: number;
 }
 
 export interface Cart {
@@ -45,11 +47,16 @@ export interface Address {
 }
 
 export type OrderStatus =
+  | "pending_payment"
   | "placed"
   | "packed"
   | "shipped"
   | "delivered"
+  | "cancelled"
   | "returned";
+
+export type PaymentMethod = "cod" | "razorpay";
+export type PaymentStatus = "pending" | "paid" | "failed" | "cod_pending" | "refund_pending" | "refunded";
 
 export interface OrderLine {
   productId: string;
@@ -63,8 +70,11 @@ export interface OrderLine {
 
 export interface Order {
   id: string;
+  number: string;
   placedAt: string;
   status: OrderStatus;
+  paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
   total: number;
   lines: OrderLine[];
 }

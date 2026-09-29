@@ -59,11 +59,14 @@ export type ImageView =
   | "model";
 
 export interface ProductImage {
+  id?: string;
   src: string;
   alt: string;
   view: ImageView;
   width: number;
   height: number;
+  /** Generated placeholder render, not real product photography. */
+  placeholder?: boolean;
 }
 
 export interface ColourVariant {
@@ -79,6 +82,19 @@ export interface CompositionPart {
 export type StretchLevel = "2-way" | "4-way" | "minimal";
 
 export type ProductBadge = "new" | "bestseller" | "limited" | "low-stock";
+
+export type StockStatus = "in_stock" | "low_stock" | "out_of_stock";
+
+/** Public availability for one colour × size (exact stock is not exposed). */
+export interface VariantAvailability {
+  id: string;
+  colour: ColourId;
+  size: SizeCode;
+  sku: string;
+  /** Purchasable quantity, capped at the per-line maximum. */
+  available: number;
+  status: StockStatus;
+}
 
 export interface Product {
   id: string;
@@ -96,7 +112,9 @@ export interface Product {
   colour: string;
   colours: ColourVariant[];
   sizes: SizeCode[];
+  /** Sizes sold out in every colour. Per-colour availability is in `variants`. */
   soldOutSizes: SizeCode[];
+  variants: VariantAvailability[];
   description: string;
   /** Images for the primary colourway (convenience alias of colours[0].images). */
   images: ProductImage[];
@@ -107,21 +125,23 @@ export interface Product {
   stretch: StretchLevel;
   features: string[];
   care: string[];
-  /** Demo-only rating. Replace with real review data from the backend. */
-  rating: { average: number; count: number };
+  /** Demo-only rating (seeded products). Omitted when there is none. */
+  rating?: { average: number; count: number };
   badges: ProductBadge[];
   releasedAt: string;
   /** Lower = more prominent in "Featured" sort. */
   featuredRank: number;
-  garment: GarmentType;
+  garment?: GarmentType;
 }
 
 /**
  * Raw catalogue record as stored in src/data/products.ts. The service layer
  * hydrates it into a Product (resolving colour names and image URLs).
  */
-export type ProductSeed = Omit<Product, "images" | "colours" | "colour"> & {
+export type ProductSeed = Omit<Product, "images" | "colours" | "colour" | "variants" | "rating" | "garment"> & {
   colourIds: ColourId[];
+  rating: { average: number; count: number };
+  garment: GarmentType;
 };
 
 export interface Category {

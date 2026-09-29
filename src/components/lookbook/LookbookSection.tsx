@@ -6,7 +6,7 @@ import { motion, useReducedMotion, useScroll, useTransform } from "motion/react"
 import { ArrowRight } from "lucide-react";
 import { useRef } from "react";
 import type { LookbookChapter } from "@/data/lookbook";
-import { catalog } from "@/lib/services/catalog";
+import { useCatalog } from "@/store/catalog";
 import { cn } from "@/lib/utils";
 import { TextReveal } from "@/components/ui/Reveal";
 
@@ -31,7 +31,8 @@ export function LookbookPanel({ chapter, headingLevel = "h3" }: { chapter: Lookb
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
   const y = useTransform(scrollYProgress, [0, 1], ["-10%", "10%"]);
   const scale = useTransform(scrollYProgress, [0, 0.5, 1], [1.15, 1.05, 1.12]);
-  const products = chapter.products.map((s) => catalog.bySlug(s)).filter(Boolean);
+  const all = useCatalog().products;
+  const products = chapter.products.map((s) => all.find((p) => p.slug === s)).filter(Boolean);
 
   return (
     <article ref={ref} aria-label={chapter.headline} className="relative h-[92svh] min-h-[560px] overflow-hidden bg-ink text-bone">

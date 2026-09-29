@@ -7,6 +7,7 @@ import { Plus, X } from "lucide-react";
 import { useState } from "react";
 import { colourMap } from "@/data/colours";
 import { useAddToBag } from "@/hooks/use-add-to-bag";
+import { soldOutSizesFor } from "@/lib/catalog-utils";
 import { cn, formatPrice } from "@/lib/utils";
 import type { ColourId, Product } from "@/types";
 import { ProductBadgeLabel } from "@/components/ui/Badge";
@@ -40,6 +41,9 @@ export function ProductCard({
   const secondary = variant.images.find((i) => i.view === "model") ?? variant.images[1];
   const href = `/products/${product.slug}${colour !== product.colours[0].colour ? `?colour=${colour}` : ""}`;
   const badge = product.badges[0];
+  const soldOut = soldOutSizesFor(product, colour);
+  const allOut = soldOut.length === product.sizes.length;
+  const lowStock = !allOut && product.variants.some((v) => v.colour === colour && v.status === "low_stock");
 
   return (
     <article className={cn("group/card relative", className)}>
@@ -76,7 +80,7 @@ export function ProductCard({
             "group-hover/card:translate-y-0 group-hover/card:opacity-100 group-focus-within/card:translate-y-0 group-focus-within/card:opacity-100",
           )}
         >
-          <QuickSizes product={product} onPick={(size) => addToBag(product, colour, size)} />
+          <QuickSizes product={product} soldOut={soldOut} onPick={(size) => addToBag(product, colour, size)} />
         </div>
 
         <button
@@ -99,6 +103,7 @@ export function ProductCard({
             >
               <QuickSizes
                 product={product}
+                soldOut={soldOut}
                 compact
                 onPick={(size) => {
                   addToBag(product, colour, size);
@@ -121,7 +126,7 @@ export function ProductCard({
             {formatPrice(product.price)}
           </p>
         </div>
-        <p className="mt-1 text-xs opacity-60">{colourMap[colour].name}</p>
+        <p className="mt-1 text-xs opacity-60">{colourMap[colour]?.name ?? colour}</p>
         <div className="mt-2.5 flex items-center justify-between gap-2">
           <div className="flex items-center gap-1" role="radiogroup" aria-label={`Colour for ${product.name}`}>
             {product.colours.map((c) => (
@@ -144,8 +149,8 @@ export function ProductCard({
               </button>
             ))}
           </div>
-          <p className="hidden font-mono text-[0.625rem] uppercase tracking-wider opacity-50 sm:block">
-            {product.sizes[0]}–{product.sizes[product.sizes.length - 1]}
+          <p className={cn("font-mono text-[0.625rem] uppercase tracking-wider", allOut || lowStock ? "opacity-80" : "hidden opacity-50 sm:block")}>
+            {allOut ? "Sold out" : lowStock ? "Low stock" : `${product.sizes[0]}–${product.sizes[product.sizes.length - 1]}`}
           </p>
         </div>
       </div>
@@ -153,13 +158,13 @@ export function ProductCard({
   );
 }
 
-function QuickSizes({ product, onPick, compact }: { product: Product; onPick: (s: Product["sizes"][number]) => void; compact?: boolean }) {
+function QuickSizes({ product, soldOut: out, onPick, compact }: { product: Product; soldOut: Product["sizes"]; onPick: (s: Product["sizes"][number]) => void; compact?: boolean }) {
   return (
     <div className="bg-bone/95 p-2 text-ink backdrop-blur" role="group" aria-label={`Quick add ${product.name} — choose size`}>
       {!compact && <p className="eyebrow mb-2 px-1 text-[0.5625rem] text-ink/60">Quick add</p>}
       <div className="grid grid-cols-5 gap-1">
         {product.sizes.map((s) => {
-          const soldOut = product.soldOutSizes.includes(s);
+          const soldOut = out.includes(s);
           return (
             <button
               key={s}

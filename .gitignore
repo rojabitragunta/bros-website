@@ -21,3 +21,6 @@ coverage
 npm-debug.log*
 *.pem
 Thumbs.db
+
+# local product photo uploads (dev only)
+public/uploads

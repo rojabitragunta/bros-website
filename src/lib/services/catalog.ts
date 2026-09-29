@@ -1,130 +1,125 @@
 /**
- * Catalogue service layer.
+ * Catalogue service (server only) — reads active products from PostgreSQL.
  *
- * Phase 1: reads the local demo catalogue.
- * Phase 2: replace each function body with a call to the catalogue API —
- * signatures are already async so no caller needs to change.
+ * The whole active catalogue is small, so it is loaded in one cached query set
+ * tagged "catalog". Admin edits, stock changes and orders invalidate the tag
+ * so storefront pages refresh immediately.
  */
+import "server-only";
+import { asc, eq, inArray } from "drizzle-orm";
+import { unstable_cache } from "next/cache";
 import { colourMap } from "@/data/colours";
-import { productSeeds } from "@/data/products";
-import type {
-  ColourId,
-  ImageView,
-  Product,
-  ProductFilters,
-  ProductImage,
-  ProductSeed,
-  SizeCode,
-} from "@/types";
+import { db, schema } from "@/lib/db";
+import { MAX_QTY, PLACEHOLDER_IMAGE, filterProducts, priceBoundsOf, stockStatus } from "@/lib/catalog-utils";
+import type { ColourId, ImageView, Product, ProductFilters, ProductImage, SizeCode } from "@/types";
 
-const VIEW_ORDER: ImageView[] = ["front", "model", "back", "side", "detail", "lifestyle"];
-const VIEW_LABEL: Record<ImageView, string> = {
-  front: "front",
-  back: "back",
-  side: "side",
-  detail: "fabric detail",
-  lifestyle: "lifestyle",
-  model: "on form",
-};
+export const CATALOG_TAG = "catalog";
 
-export function productImagePath(slug: string, colour: ColourId, view: ImageView) {
-  return `/images/products/${slug}/${colour}-${view}.webp`;
-}
+type Row = typeof schema.products.$inferSelect;
+type ImageRow = typeof schema.productImages.$inferSelect;
+type VariantRow = typeof schema.variants.$inferSelect;
 
-function buildImages(seed: ProductSeed, colour: ColourId): ProductImage[] {
-  const colourName = colourMap[colour].name;
-  return VIEW_ORDER.map((view) => ({
-    src: productImagePath(seed.slug, colour, view),
-    alt: `${seed.name} in ${colourName} — ${VIEW_LABEL[view]}`,
-    view,
-    width: 1200,
-    height: 1500,
-  }));
-}
-
-function hydrate(seed: ProductSeed): Product {
-  const { colourIds, ...rest } = seed;
-  const colours = colourIds.map((colour) => ({ colour, images: buildImages(seed, colour) }));
+export function toProduct(p: Row, images: ImageRow[], variants: VariantRow[]): Product {
+  const colourIds = p.colourIds as ColourId[];
+  const colours = colourIds.map((colour) => {
+    const own = images
+      .filter((i) => i.colour === colour)
+      .sort((a, b) => a.position - b.position)
+      .map<ProductImage>((i) => ({
+        id: i.id,
+        src: i.url,
+        alt: i.alt || `${p.name} in ${colourMap[colour]?.name ?? colour}`,
+        view: i.view as ImageView,
+        width: i.width,
+        height: i.height,
+        placeholder: i.isPlaceholder,
+      }));
+    return {
+      colour,
+      images: own.length
+        ? own
+        : [{ src: PLACEHOLDER_IMAGE, alt: `${p.name} — photo coming soon`, view: "front" as const, width: 1200, height: 1500, placeholder: true }],
+    };
+  });
+  const vs = variants
+    .filter((v) => v.active && colourIds.includes(v.colour as ColourId) && p.sizes.includes(v.size))
+    .map((v) => ({
+      id: v.id,
+      colour: v.colour as ColourId,
+      size: v.size as SizeCode,
+      sku: v.sku,
+      available: Math.min(v.stock, MAX_QTY),
+      status: stockStatus(v.stock, p.lowStockThreshold),
+    }));
+  const sizes = p.sizes as SizeCode[];
+  const lowStock = vs.some((v) => v.status === "low_stock") && !vs.some((v) => v.status === "in_stock");
   return {
-    ...rest,
-    colour: colourMap[colourIds[0]].name,
+    id: p.id,
+    slug: p.slug,
+    name: p.name,
+    tagline: p.tagline,
+    price: p.price,
+    compareAtPrice: p.compareAtPrice ?? undefined,
+    category: p.category as Product["category"],
+    gender: p.gender as Product["gender"],
+    collections: p.collections as Product["collections"],
+    colour: colourMap[colourIds[0]]?.name ?? colourIds[0] ?? "",
     colours,
-    images: colours[0].images,
+    images: colours[0]?.images ?? [],
+    sizes,
+    soldOutSizes: sizes.filter((s) => !vs.some((v) => v.size === s && v.available > 0)),
+    variants: vs,
+    description: p.description,
+    fabric: p.fabric,
+    gsm: p.gsm,
+    composition: p.composition,
+    fit: p.fit,
+    stretch: p.stretch as Product["stretch"],
+    features: p.features,
+    care: p.care,
+    rating: p.ratingAverage != null && p.ratingCount ? { average: p.ratingAverage / 10, count: p.ratingCount } : undefined,
+    badges: [...(p.badges as Product["badges"]), ...(lowStock ? (["low-stock"] as const) : [])],
+    releasedAt: p.releasedAt.toISOString().slice(0, 10),
+    featuredRank: p.featuredRank,
+    garment: (p.garment ?? undefined) as Product["garment"],
   };
 }
 
-const catalogue: Product[] = productSeeds.map(hydrate);
-const bySlug = new Map(catalogue.map((p) => [p.slug, p]));
-const byId = new Map(catalogue.map((p) => [p.id, p]));
-
-/* Synchronous accessors — for client components working off local data. */
-export const catalog = {
-  all: () => catalogue,
-  bySlug: (slug: string) => bySlug.get(slug),
-  byId: (id: string) => byId.get(id),
-};
-
-export function matchesCategory(p: Product, category?: string) {
-  if (!category || category === "all") return true;
-  if (category === "men" || category === "women") return p.gender.includes(category);
-  if (category === "new-drop" || category === "drop-001") return p.collections.includes("drop-001");
-  return p.category === category;
+/** Loads products (any status unless activeOnly) with their images and variants. */
+export async function loadProducts(where?: { ids?: string[]; activeOnly?: boolean }): Promise<Product[]> {
+  const rows = await db
+    .select()
+    .from(schema.products)
+    .where(where?.ids ? inArray(schema.products.id, where.ids) : where?.activeOnly ? eq(schema.products.status, "active") : undefined)
+    .orderBy(asc(schema.products.featuredRank));
+  if (!rows.length) return [];
+  const ids = rows.map((r) => r.id);
+  const [images, variants] = await Promise.all([
+    db.select().from(schema.productImages).where(inArray(schema.productImages.productId, ids)),
+    db.select().from(schema.variants).where(inArray(schema.variants.productId, ids)),
+  ]);
+  return rows.map((r) => toProduct(r, images.filter((i) => i.productId === r.id), variants.filter((v) => v.productId === r.id)));
 }
 
-export function matchesQuery(p: Product, query?: string) {
-  const norm = (s: string) => s.toLowerCase().replace(/['’"]/g, "").replace(/-/g, " ");
-  const q = norm(query ?? "").trim();
-  if (!q) return true;
-  const hay = norm([
-    p.name,
-    p.category,
-    p.tagline,
-    p.fabric,
-    p.fit,
-    ...p.gender,
-    ...p.colours.map((c) => colourMap[c.colour].name),
-  ].join(" "));
-  return q.split(/\s+/).every((term) => hay.includes(term));
-}
-
-export function filterProducts(list: Product[], f: ProductFilters): Product[] {
-  const out = list.filter(
-    (p) =>
-      matchesCategory(p, f.category) &&
-      (!f.collection || p.collections.includes(f.collection as Product["collections"][number])) &&
-      matchesQuery(p, f.query) &&
-      (!f.sizes?.length || f.sizes.some((s: SizeCode) => p.sizes.includes(s) && !p.soldOutSizes.includes(s))) &&
-      (!f.colours?.length || p.colours.some((c) => f.colours!.includes(c.colour))) &&
-      (f.priceMax === undefined || p.price <= f.priceMax),
-  );
-  switch (f.sort) {
-    case "newest":
-      return out.sort((a, b) => b.releasedAt.localeCompare(a.releasedAt) || a.featuredRank - b.featuredRank);
-    case "price-asc":
-      return out.sort((a, b) => a.price - b.price);
-    case "price-desc":
-      return out.sort((a, b) => b.price - a.price);
-    default:
-      return out.sort((a, b) => a.featuredRank - b.featuredRank);
-  }
-}
-
-/* Async API — the shape pages use today and the backend will implement. */
+const loadCatalogue = unstable_cache(() => loadProducts({ activeOnly: true }), ["catalogue-v1"], {
+  tags: [CATALOG_TAG],
+  revalidate: 300,
+});
 
 export async function getProducts(filters: ProductFilters = {}): Promise<Product[]> {
-  return filterProducts([...catalogue], filters);
+  return filterProducts([...(await loadCatalogue())], filters);
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | undefined> {
-  return bySlug.get(slug);
+  return (await loadCatalogue()).find((p) => p.slug === slug);
 }
 
 export async function getFeaturedProducts(limit = 6): Promise<Product[]> {
-  return filterProducts([...catalogue], { sort: "featured" }).slice(0, limit);
+  return (await getProducts({ sort: "featured" })).slice(0, limit);
 }
 
 export async function getRelatedProducts(product: Product, limit = 4): Promise<Product[]> {
-  const scored = catalogue
+  const scored = (await loadCatalogue())
     .filter((p) => p.id !== product.id)
     .map((p) => ({
       p,
@@ -138,10 +133,9 @@ export async function getRelatedProducts(product: Product, limit = 4): Promise<P
 }
 
 export async function searchProducts(query: string, limit = 8): Promise<Product[]> {
-  return filterProducts([...catalogue], { query }).slice(0, limit);
+  return (await getProducts({ query })).slice(0, limit);
 }
 
-export const priceBounds = {
-  min: Math.min(...catalogue.map((p) => p.price)),
-  max: Math.max(...catalogue.map((p) => p.price)),
-};
+export async function getPriceBounds() {
+  return priceBoundsOf(await loadCatalogue());
+}

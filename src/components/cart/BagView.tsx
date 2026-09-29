@@ -2,9 +2,10 @@
 
 import { AnimatePresence } from "motion/react";
 import { ArrowRight, Lock, RotateCcw, Truck } from "lucide-react";
+import { computeTotals } from "@/lib/pricing";
 import { formatPrice } from "@/lib/utils";
-import { catalog } from "@/lib/services/catalog";
-import { selectCount, selectSubtotal, useCart } from "@/store/cart";
+import { useCatalog } from "@/store/catalog";
+import { selectCount, useCart } from "@/store/cart";
 import { useUI } from "@/store/ui";
 import { ButtonLink } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -13,8 +14,9 @@ import { ProductCard } from "@/components/product/ProductCard";
 import { CartLine } from "./CartLine";
 
 export function OrderSummary({ cta }: { cta?: React.ReactNode }) {
-  const subtotal = useCart(selectSubtotal);
+  const items = useCart((s) => s.items);
   const count = useCart(selectCount);
+  const { subtotal, shipping, taxIncluded, total } = computeTotals(items);
   return (
     <div className="border border-line bg-graphite p-5 sm:p-7">
       <h2 className="label mb-6">Order summary</h2>
@@ -27,14 +29,18 @@ export function OrderSummary({ cta }: { cta?: React.ReactNode }) {
         </div>
         <div className="flex justify-between">
           <dt className="text-mist">Shipping</dt>
-          <dd className="font-mono uppercase">Free</dd>
+          <dd className="font-mono uppercase">{shipping ? formatPrice(shipping) : "Free"}</dd>
+        </div>
+        <div className="flex justify-between text-xs">
+          <dt className="text-steel">GST (included in prices)</dt>
+          <dd className="font-mono tabular-nums text-steel">{formatPrice(taxIncluded)}</dd>
         </div>
         <div className="flex justify-between border-t border-line pt-4 text-base">
           <dt>Total</dt>
-          <dd className="font-mono tabular-nums">{formatPrice(subtotal)}</dd>
+          <dd className="font-mono tabular-nums">{formatPrice(total)}</dd>
         </div>
       </dl>
-      <p className="mt-2 text-[0.6875rem] text-steel">Inclusive of GST.</p>
+      <p className="mt-2 text-[0.6875rem] text-steel">All prices include GST. No hidden charges.</p>
       {cta && <div className="mt-6">{cta}</div>}
       <ul className="mt-6 space-y-3 border-t border-line pt-5 text-xs text-mist">
         <li className="flex items-center gap-3">
@@ -44,7 +50,7 @@ export function OrderSummary({ cta }: { cta?: React.ReactNode }) {
           <RotateCcw className="size-4" strokeWidth={1.5} aria-hidden /> 7-day easy returns
         </li>
         <li className="flex items-center gap-3">
-          <Lock className="size-4" strokeWidth={1.5} aria-hidden /> Secure checkout — coming in Phase 2
+          <Lock className="size-4" strokeWidth={1.5} aria-hidden /> Secure checkout · Cash on Delivery available
         </li>
       </ul>
     </div>
@@ -55,9 +61,8 @@ export function BagView() {
   const hydrated = useUI((s) => s.hydrated);
   const items = useCart((s) => s.items);
   const count = useCart(selectCount);
-  const suggestions = catalog
-    .all()
-    .filter((p) => !items.some((i) => i.productId === p.id))
+  const suggestions = useCatalog()
+    .products.filter((p) => !items.some((i) => i.productId === p.id))
     .slice(0, 4);
 
   return (

@@ -2,7 +2,7 @@ import { ShopView, type ShopInitial } from "@/components/shop/ShopView";
 import { SIZE_OPTIONS } from "@/components/shop/FilterPanel";
 import { colours } from "@/data/colours";
 import { shopCategories } from "@/data/categories";
-import { getProducts, priceBounds } from "@/lib/services/catalog";
+import { getPriceBounds, getProducts } from "@/lib/services/catalog";
 import { pageMetadata } from "@/lib/seo";
 import type { ColourId, SizeCode, SortOption } from "@/types";
 
@@ -10,7 +10,7 @@ type SP = Record<string, string | string[] | undefined>;
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
-function parse(sp: SP): ShopInitial {
+function parse(sp: SP, priceBounds: { min: number; max: number }): ShopInitial {
   const category = one(sp.category);
   const sort = one(sp.sort) as SortOption | undefined;
   const max = Number(one(sp.max));
@@ -25,7 +25,7 @@ function parse(sp: SP): ShopInitial {
 }
 
 export async function generateMetadata({ searchParams }: { searchParams: Promise<SP> }) {
-  const s = parse(await searchParams);
+  const s = parse(await searchParams, await getPriceBounds());
   const label = s.collection ? "Drop 001" : s.category === "all" ? "Shop All" : shopCategories.find((c) => c.slug === s.category)?.label;
   return pageMetadata({
     title: `${label} — Performance Activewear`,
@@ -35,7 +35,8 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
 }
 
 export default async function ShopPage({ searchParams }: { searchParams: Promise<SP> }) {
-  const initial = parse(await searchParams);
+  const priceBounds = await getPriceBounds();
+  const initial = parse(await searchParams, priceBounds);
   const products = await getProducts();
   // Keyed by the query so client state resets when the nav links change filters.
   return <ShopView key={JSON.stringify(initial)} products={products} initial={initial} bounds={priceBounds} />;

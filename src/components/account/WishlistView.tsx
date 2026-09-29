@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { catalog } from "@/lib/services/catalog";
+import { useCatalog } from "@/store/catalog";
 import { useUI } from "@/store/ui";
 import { useWishlist } from "@/store/wishlist";
 import type { Product } from "@/types";
@@ -12,9 +12,10 @@ import { ProductCard } from "@/components/product/ProductCard";
 export function WishlistGrid({ compact }: { compact?: boolean }) {
   const hydrated = useUI((s) => s.hydrated);
   const items = useWishlist((s) => s.items);
-  const products = items.map((i) => catalog.byId(i.productId)).filter((p): p is Product => Boolean(p));
+  const { products: all, loaded } = useCatalog();
+  const products = items.map((i) => all.find((p) => p.id === i.productId)).filter((p): p is Product => Boolean(p));
 
-  if (!hydrated) return <ProductGridSkeleton count={4} />;
+  if (!hydrated || (!loaded && items.length)) return <ProductGridSkeleton count={4} />;
   if (!products.length)
     return (
       <EmptyState

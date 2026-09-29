@@ -58,7 +58,8 @@ export const infoPages: InfoPage[] = [
       { heading: "When does Drop 001 restock?", body: ["Sizes that sell out will be restocked where possible. Join the list at the bottom of the homepage to hear first."] },
       { heading: "How should I wash performance kit?", body: ["Cold wash, inside out, no fabric softener, and line dry. See the Care section on any product page."] },
       { heading: "Do you ship outside India?", body: ["Not yet. We're launching across India first."] },
-      { heading: "Is this a live store?", body: ["This is a Phase 1 preview. Checkout, payments and accounts are not live yet."] },
+      { heading: "How do I pay and track my order?", body: ["Create an account, check out with Cash on Delivery (or online payment where available), and follow your order's status from your account page."] },
+      { heading: "Can I cancel an order?", body: ["Yes — until it is packed. Open the order in your account and choose Cancel order."] },
     ],
   },
   {

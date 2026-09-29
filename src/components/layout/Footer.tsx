@@ -76,7 +76,7 @@ export function Footer() {
             ))}
           </ul>
         </nav>
-        <p className="font-mono uppercase tracking-[0.16em] text-steel">Phase 1 preview · Demo data</p>
+        <p className="font-mono uppercase tracking-[0.16em] text-steel">Made in Hyderabad</p>
       </div>
     </footer>
   );

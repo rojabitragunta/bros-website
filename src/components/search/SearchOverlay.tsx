@@ -5,7 +5,8 @@ import { ArrowRight, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useDeferredValue, useId, useMemo, useState } from "react";
 import { useDialog } from "@/hooks/use-dialog";
-import { catalog, filterProducts } from "@/lib/services/catalog";
+import { filterProducts } from "@/lib/catalog-utils";
+import { useCatalog } from "@/store/catalog";
 import { useSearchHistory, useUI } from "@/store/ui";
 import { SearchIdle, SearchNoResults, SearchResultRow } from "./SearchSuggestions";
 
@@ -22,10 +23,11 @@ function SearchPanel({ onClose }: { onClose: () => void }) {
   const push = useSearchHistory((s) => s.push);
   const ref = useDialog<HTMLDivElement>(true, onClose, { initialFocus: "input" });
   const inputId = useId();
+  const all = useCatalog().products;
 
-  const results = useMemo(() => (deferred.trim() ? filterProducts([...catalog.all()], { query: deferred }).slice(0, 6) : []), [deferred]);
-  const trending = useMemo(() => filterProducts([...catalog.all()], { sort: "featured" }).slice(0, 3), []);
-  const total = useMemo(() => (deferred.trim() ? filterProducts([...catalog.all()], { query: deferred }).length : 0), [deferred]);
+  const results = useMemo(() => (deferred.trim() ? filterProducts([...all], { query: deferred }).slice(0, 6) : []), [deferred, all]);
+  const trending = useMemo(() => filterProducts([...all], { sort: "featured" }).slice(0, 3), [all]);
+  const total = useMemo(() => (deferred.trim() ? filterProducts([...all], { query: deferred }).length : 0), [deferred, all]);
 
   const submit = (q = query) => {
     const term = q.trim();

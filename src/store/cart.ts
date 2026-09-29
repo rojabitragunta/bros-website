@@ -2,26 +2,32 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { MAX_QTY } from "@/lib/catalog-utils";
 import type { CartItem } from "@/types";
 
 /**
- * Cart — local state persisted to localStorage (Phase 1).
- * Phase 2: sync with the cart API; keep this store as the optimistic layer.
+ * Cart — local state persisted to localStorage (works for guests).
+ * Signed-in customers are synced to the server cart by components/layout/CartSync.
  */
 interface CartState {
   items: CartItem[];
+  /** Replace all lines (server sync / validation). */
+  replace: (items: CartItem[]) => void;
   add: (item: Omit<CartItem, "key" | "quantity">, quantity?: number) => void;
   remove: (key: string) => void;
   setQuantity: (key: string, quantity: number) => void;
   clear: () => void;
 }
 
-export const MAX_QTY = 10;
+export { MAX_QTY };
+
+const cap = (i: Pick<CartItem, "max">) => Math.min(MAX_QTY, i.max ?? MAX_QTY);
 
 export const useCart = create<CartState>()(
   persist(
     (set) => ({
       items: [],
+      replace: (items) => set({ items }),
       add: (item, quantity = 1) =>
         set((s) => {
           const key = `${item.productId}:${item.colour}:${item.size}`;
@@ -29,11 +35,11 @@ export const useCart = create<CartState>()(
           if (existing) {
             return {
               items: s.items.map((i) =>
-                i.key === key ? { ...i, quantity: Math.min(MAX_QTY, i.quantity + quantity) } : i,
+                i.key === key ? { ...i, max: item.max ?? i.max, quantity: Math.min(cap(item), i.quantity + quantity) } : i,
               ),
             };
           }
-          return { items: [{ ...item, key, quantity }, ...s.items] };
+          return { items: [{ ...item, key, quantity: Math.min(cap(item), quantity) }, ...s.items] };
         }),
       remove: (key) => set((s) => ({ items: s.items.filter((i) => i.key !== key) })),
       setQuantity: (key, quantity) =>
@@ -41,7 +47,7 @@ export const useCart = create<CartState>()(
           items:
             quantity <= 0
               ? s.items.filter((i) => i.key !== key)
-              : s.items.map((i) => (i.key === key ? { ...i, quantity: Math.min(MAX_QTY, quantity) } : i)),
+              : s.items.map((i) => (i.key === key ? { ...i, quantity: Math.min(cap(i), quantity) } : i)),
         })),
       clear: () => set({ items: [] }),
     }),

@@ -7,6 +7,7 @@ import { Footer } from "@/components/layout/Footer";
 import { Navbar } from "@/components/layout/Navbar";
 import { Overlays } from "@/components/layout/Overlays";
 import { Providers } from "@/components/layout/Providers";
+import { StoreOnly } from "@/components/layout/StoreOnly";
 import { media } from "@/data/media";
 import { site } from "@/data/site";
 import "@/styles/globals.css";
@@ -56,13 +57,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           Skip to content
         </a>
         <Providers>
-          <AnnouncementBar />
-          <Navbar />
+          <StoreOnly>
+            <AnnouncementBar />
+            <Navbar />
+          </StoreOnly>
           <main id="main" tabIndex={-1} className="outline-none">
             {children}
           </main>
-          <Footer />
-          <Overlays />
+          <StoreOnly>
+            <Footer />
+            <Overlays />
+          </StoreOnly>
         </Providers>
       </body>
     </html>

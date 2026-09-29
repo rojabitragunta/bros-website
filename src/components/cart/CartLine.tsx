@@ -41,7 +41,7 @@ export function CartLine({ item, size = "sm", onNavigate }: { item: CartItem; si
         </div>
         {item.quantity > 1 && <p className="mt-1 font-mono text-[0.6875rem] text-steel">{formatPrice(item.price)} each</p>}
         <div className="mt-auto flex items-center justify-between pt-4">
-          <QuantityStepper value={item.quantity} max={MAX_QTY} onChange={(n) => setQuantity(item.key, n)} label={item.name} />
+          <QuantityStepper value={item.quantity} max={Math.min(MAX_QTY, item.max ?? MAX_QTY)} onChange={(n) => setQuantity(item.key, n)} label={item.name} />
           <button
             type="button"
             onClick={() => remove(item.key)}

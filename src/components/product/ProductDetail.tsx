@@ -7,11 +7,13 @@ import { Check, RotateCcw, Ruler, Truck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { colourMap } from "@/data/colours";
 import { useAddToBag } from "@/hooks/use-add-to-bag";
+import { STOCK_LABEL, findVariant, soldOutSizesFor } from "@/lib/catalog-utils";
 import { cn, formatPrice } from "@/lib/utils";
 import { useUI } from "@/store/ui";
 import type { ColourId, Product, SizeCode } from "@/types";
 import { ProductBadgeLabel } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { QuantityStepper } from "@/components/ui/QuantityStepper";
 import { Rating } from "@/components/ui/Rating";
 import { ImageGallery } from "./ImageGallery";
 import { WishlistButton } from "./WishlistButton";
@@ -19,6 +21,7 @@ import { WishlistButton } from "./WishlistButton";
 export function ProductDetail({ product }: { product: Product }) {
   const [colour, setColour] = useState<ColourId>(product.colours[0].colour);
   const [size, setSize] = useState<SizeCode | null>(null);
+  const [qty, setQty] = useState(1);
   const [sizeError, setSizeError] = useState(false);
   const [added, setAdded] = useState(false);
   const [showSticky, setShowSticky] = useState(false);
@@ -44,9 +47,17 @@ export function ProductDetail({ product }: { product: Product }) {
   }, []);
 
   const variant = product.colours.find((c) => c.colour === colour) ?? product.colours[0];
+  const soldOutSizes = soldOutSizesFor(product, colour);
+  const colourSoldOut = soldOutSizes.length === product.sizes.length;
+  const stock = size ? findVariant(product, colour, size) : undefined;
+  const maxQty = Math.max(1, stock?.available ?? 1);
+  const placeholderPhotos = variant.images.every((i) => i.placeholder);
 
   const selectColour = (c: ColourId) => {
     setColour(c);
+    // Keep the chosen size only if it is still available in the new colour.
+    if (size && soldOutSizesFor(product, c).includes(size)) setSize(null);
+    setQty(1);
     const url = new URL(window.location.href);
     if (c === product.colours[0].colour) url.searchParams.delete("colour");
     else url.searchParams.set("colour", c);
@@ -63,18 +74,17 @@ export function ProductDetail({ product }: { product: Product }) {
 
   const onAdd = () => {
     if (!requireSize()) return;
-    addToBag(product, colour, size!);
+    if (!addToBag(product, colour, size!, Math.min(qty, maxQty))) return;
     setAdded(true);
     setTimeout(() => setAdded(false), 1800);
   };
 
   const onBuyNow = () => {
     if (!requireSize()) return;
-    addToBag(product, colour, size!, 1, { openCart: false });
-    router.push("/checkout");
+    if (addToBag(product, colour, size!, Math.min(qty, maxQty), { openCart: false })) router.push("/checkout");
   };
 
-  const addLabel = added ? "Added" : size ? `Add to Bag — ${formatPrice(product.price)}` : "Add to Bag";
+  const addLabel = colourSoldOut ? "Sold out" : added ? "Added" : size ? `Add to Bag — ${formatPrice(product.price * qty)}` : "Add to Bag";
 
   return (
     <>
@@ -82,6 +92,11 @@ export function ProductDetail({ product }: { product: Product }) {
         <div className="min-w-0 md:col-span-7">
           <div className="md:sticky md:top-[calc(var(--nav-h)+1.5rem)]">
             <ImageGallery images={variant.images} name={product.name} />
+            {placeholderPhotos && (
+              <p className="container-x mt-3 font-mono text-[0.625rem] uppercase tracking-wider text-steel md:px-0">
+                Placeholder render — product photography coming soon
+              </p>
+            )}
           </div>
         </div>
 
@@ -108,10 +123,12 @@ export function ProductDetail({ product }: { product: Product }) {
 
             <div className="mt-6 flex items-center justify-between gap-4 border-y border-line py-4">
               <p className="font-mono text-xl tabular-nums">{formatPrice(product.price)}</p>
-              <div className="text-right">
-                <Rating value={product.rating.average} count={product.rating.count} />
-                <p className="mt-1 font-mono text-[0.5625rem] uppercase tracking-wider text-steel">Sample rating · demo</p>
-              </div>
+              {product.rating && (
+                <div className="text-right">
+                  <Rating value={product.rating.average} count={product.rating.count} />
+                  <p className="mt-1 font-mono text-[0.5625rem] uppercase tracking-wider text-steel">Sample rating · demo</p>
+                </div>
+              )}
             </div>
             <p className="mt-2 text-[0.6875rem] text-steel">Inclusive of all taxes</p>
 
@@ -119,7 +136,7 @@ export function ProductDetail({ product }: { product: Product }) {
             <fieldset className="mt-8">
               <legend className="mb-3 flex w-full items-baseline justify-between">
                 <span className="eyebrow text-mist">Colour</span>
-                <span className="text-sm">{colourMap[colour].name}</span>
+                <span className="text-sm">{colourMap[colour]?.name ?? colour}</span>
               </legend>
               <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Colour">
                 {product.colours.map((c) => {
@@ -130,11 +147,11 @@ export function ProductDetail({ product }: { product: Product }) {
                       type="button"
                       role="radio"
                       aria-checked={active}
-                      aria-label={colourMap[c.colour].name}
+                      aria-label={colourMap[c.colour]?.name ?? c.colour}
                       onClick={() => selectColour(c.colour)}
                       className={cn("grid size-12 place-items-center border transition-colors", active ? "border-bone" : "border-line hover:border-bone/50")}
                     >
-                      <span className="size-7" style={{ backgroundColor: colourMap[c.colour].hex }} />
+                      <span className="size-7" style={{ backgroundColor: colourMap[c.colour]?.hex }} />
                     </button>
                   );
                 })}
@@ -155,7 +172,7 @@ export function ProductDetail({ product }: { product: Product }) {
               </legend>
               <div className="grid grid-cols-5 gap-1.5" role="radiogroup" aria-label="Size" aria-describedby={sizeError ? "size-error" : undefined}>
                 {product.sizes.map((s) => {
-                  const soldOut = product.soldOutSizes.includes(s);
+                  const soldOut = soldOutSizes.includes(s);
                   const active = size === s;
                   return (
                     <button
@@ -168,6 +185,7 @@ export function ProductDetail({ product }: { product: Product }) {
                       onClick={() => {
                         setSize(s);
                         setSizeError(false);
+                        setQty((q) => Math.min(q, Math.max(1, findVariant(product, colour, s)?.available ?? 1)));
                       }}
                       className={cn(
                         "relative h-14 border font-mono text-sm transition-colors",
@@ -187,13 +205,28 @@ export function ProductDetail({ product }: { product: Product }) {
                   Please choose a size to continue.
                 </p>
               )}
-              {product.soldOutSizes.length > 0 && <p className="mt-2 text-xs text-steel">Crossed-out sizes are sold out.</p>}
+              {soldOutSizes.length > 0 && !colourSoldOut && <p className="mt-2 text-xs text-steel">Crossed-out sizes are sold out in this colour.</p>}
+              {colourSoldOut && <p className="mt-2 text-xs text-red-400">This colour is sold out. Try another colour.</p>}
+              {stock && (
+                <p aria-live="polite" className={cn("mt-3 flex items-center gap-2 font-mono text-[0.6875rem] uppercase tracking-wider", stock.status === "low_stock" ? "text-amber-300" : "text-mist")}>
+                  <span className={cn("size-1.5 rounded-full", stock.status === "low_stock" ? "bg-amber-300" : "bg-emerald-400")} aria-hidden />
+                  {stock.status === "low_stock" ? `Low stock — only ${stock.available} left` : STOCK_LABEL[stock.status]}
+                </p>
+              )}
             </motion.fieldset>
+
+            {/* Quantity */}
+            {!colourSoldOut && (
+              <div className="mt-6 flex items-center justify-between gap-4">
+                <span className="eyebrow text-mist">Quantity</span>
+                <QuantityStepper value={qty} max={maxQty} onChange={(n) => setQty(Math.max(1, Math.min(n, maxQty)))} label={product.name} />
+              </div>
+            )}
 
             {/* CTAs */}
             <div ref={ctaRef} className="mt-8 grid gap-2">
               <div className="grid grid-cols-[1fr_auto] gap-2">
-                <Button size="lg" onClick={onAdd} aria-live="polite" className="h-14 sm:h-14">
+                <Button size="lg" onClick={onAdd} disabled={colourSoldOut} aria-live="polite" className="h-14 sm:h-14">
                   <AnimatePresence mode="wait" initial={false}>
                     <motion.span key={addLabel} className="flex items-center gap-2" initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -10, opacity: 0 }} transition={{ duration: 0.2 }}>
                       {added && <Check className="size-4" strokeWidth={2} aria-hidden />}
@@ -203,7 +236,7 @@ export function ProductDetail({ product }: { product: Product }) {
                 </Button>
                 <WishlistButton product={product} variant="full" className="w-14 px-0 sm:w-auto sm:px-5 [&>span:last-child]:hidden sm:[&>span:last-child]:inline" />
               </div>
-              <Button size="lg" variant="outline" onClick={onBuyNow} className="h-14 sm:h-14">
+              <Button size="lg" variant="outline" onClick={onBuyNow} disabled={colourSoldOut} className="h-14 sm:h-14">
                 Buy Now
               </Button>
             </div>
@@ -236,12 +269,12 @@ export function ProductDetail({ product }: { product: Product }) {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{product.name.replace("BRO'S ", "")}</p>
                 <p className="font-mono text-xs text-mist">
-                  {formatPrice(product.price)} · {colourMap[colour].name}
+                  {formatPrice(product.price)} · {colourMap[colour]?.name ?? colour}
                   {size ? ` · ${size}` : ""}
                 </p>
               </div>
-              <Button size="md" onClick={onAdd} className="h-12 shrink-0">
-                {added ? "Added" : size ? "Add to Bag" : "Select size"}
+              <Button size="md" onClick={onAdd} disabled={colourSoldOut} className="h-12 shrink-0">
+                {colourSoldOut ? "Sold out" : added ? "Added" : size ? "Add to Bag" : "Select size"}
               </Button>
             </div>
           </motion.div>

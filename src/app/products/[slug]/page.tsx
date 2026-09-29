@@ -15,7 +15,9 @@ export async function generateStaticParams() {
   return (await getProducts()).map((p) => ({ slug: p.slug }));
 }
 
-export const dynamicParams = false;
+// New products added in the admin render on first request, then are cached.
+export const dynamicParams = true;
+export const revalidate = 300;
 
 export async function generateMetadata({ params }: { params: Params }) {
   const product = await getProductBySlug((await params).slug);
@@ -34,7 +36,6 @@ export default async function ProductPage({ params }: { params: Params }) {
   if (!product) notFound();
   const related = await getRelatedProducts(product, 4);
 
-  // Structured data placeholder — availability/price to come from inventory API.
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -42,14 +43,14 @@ export default async function ProductPage({ params }: { params: Params }) {
     description: product.description,
     sku: product.id,
     brand: { "@type": "Brand", name: site.name },
-    color: product.colours.map((c) => colourMap[c.colour].name).join(", "),
+    color: product.colours.map((c) => colourMap[c.colour]?.name ?? c.colour).join(", "),
     material: product.composition.map((c) => `${c.percent}% ${c.material}`).join(", "),
-    image: product.images.slice(0, 4).map((i) => `${site.url}${i.src}`),
+    image: product.images.slice(0, 4).map((i) => (i.src.startsWith("http") ? i.src : `${site.url}${i.src}`)),
     offers: {
       "@type": "Offer",
       priceCurrency: "INR",
       price: product.price,
-      availability: "https://schema.org/PreOrder",
+      availability: product.variants.some((v) => v.available > 0) ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
       url: `${site.url}/products/${product.slug}`,
     },
   };

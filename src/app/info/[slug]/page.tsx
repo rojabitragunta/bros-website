@@ -94,7 +94,7 @@ export default async function InfoPage({ params }: { params: Params }) {
           </div>
 
           <p className="mt-16 border-t border-dashed border-line pt-5 font-mono text-[0.625rem] uppercase tracking-wider text-steel">
-            Draft placeholder content · Phase 1 preview
+            Draft policy · Final version pending review
           </p>
         </article>
       </div>
